@@ -25,6 +25,8 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - name: Check Attic publication handling without credentials
+        run: python3 ci/test-push-attic.py
       - id: matrix
         env:
           SELECTED_PACKAGE: ${{ inputs.package }}
@@ -44,13 +46,16 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: cachix/install-nix-action@3c6342b75005b9cc7c7d4069c3e9179247c89012 # v31
+      - uses: nixbuild/nix-quick-install-action@9f63be77f412a248c9d9a65a4c82cf066cdf8f0c # v35
         with:
-          extra_nix_config: |
+          nix_version: "2.34.7"
+          enable_kvm: false
+          nix_conf: |
             experimental-features = nix-command flakes
             accept-flake-config = false
             substituters = https://cache.nixos.org/
-            extra-substituters =
+            extra-substituters = ${{ vars.ATTIC_SUBSTITUTER }}
+            extra-trusted-public-keys = ${{ vars.ATTIC_PUBLIC_KEY }}
             max-jobs = 1
             cores = 3
       - name: Evaluate and build the selected native package
@@ -61,8 +66,28 @@ jobs:
           set -euo pipefail
           test "$(nix eval --impure --raw --expr builtins.currentSystem)" = "$TARGET_SYSTEM"
           target=".#packages.$TARGET_SYSTEM.$TARGET_PACKAGE"
+          SECONDS=0
           nix build "$target" --no-write-lock-file --no-link --print-out-paths -L > outputs.txt
           {
             echo "Built $TARGET_PACKAGE for $TARGET_SYSTEM"
+            echo "Package build: ${SECONDS}s"
             cat outputs.txt
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Install the pinned Attic client
+        id: attic
+        if: ${{ vars.ATTIC_PUSH_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          client=$(nix build --inputs-from . 'nixpkgs#attic-client' --no-write-lock-file --no-link --print-out-paths)
+          test -x "$client/bin/attic"
+          echo "binary=$client/bin/attic" >> "$GITHUB_OUTPUT"
+      - name: Publish successful package outputs to Attic
+        if: ${{ vars.ATTIC_PUSH_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        timeout-minutes: 30
+        env:
+          ATTIC_BIN: ${{ steps.attic.outputs.binary }}
+          ATTIC_ENDPOINT: ${{ vars.ATTIC_ENDPOINT }}
+          ATTIC_CACHE: ${{ vars.ATTIC_CACHE }}
+          ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
+        run: python3 ci/push-attic.py --outputs outputs.txt
