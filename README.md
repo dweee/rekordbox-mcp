@@ -292,3 +292,41 @@ MIT License
 **ALWAYS backup your rekordbox library before use. Test thoroughly with backup copies before using on your main library.**
 
 By using this software, you acknowledge that you understand these risks and agree to use it at your own responsibility.
+## Track relinking
+
+Run `rekordbox-mcp` after installation and configure it in your MCP client.
+Use `--database-path DIRECTORY` or `REKORDBOX_DATABASE_PATH` to override the
+detected database directory.
+
+Three additional tools are available:
+
+* `find_relink_candidates(source_directories, track_ids=None, top_n=5)` scans only
+  explicit directories. By default it matches missing tracks; explicit IDs also
+  allow upgrade assessment. It ranks tags, filename similarity and duration,
+  reports ambiguous candidates, and never automatically replaces anything.
+* `inspect_audio_files(paths, fingerprint=False)` reports actual codec, duration,
+  tags, bit depth, bitrate, sample rate and SHA256. Optional Chromaprint supports
+  audio comparison. Headers and fingerprints do not prove source provenance,
+  spectral quality, the same edit or identical cue alignment.
+* `relink_tracks(replacements, dry_run=True)` previews explicit selections. Each
+  selection supplies `track_id`, `expected_old_path` and `new_path`. Apply the
+  returned `apply_replacements` (which includes `expected_sha256`) with
+  `dry_run=false`. Changed hashes or stale paths are rejected. Different formats,
+  unknown duration or duration difference above the tolerance (default 2 seconds)
+  require explicit `accept_timing_risk=true` when applying. Upgrades of present
+  files require `only_missing=false`.
+
+Close Rekordbox before applying. Existing track IDs, playlists, ratings, cues,
+loops and grids remain attached to the entry. ANLZ path tags and physical file
+properties are updated, without moving/deleting/retagging source audio. Duration
+agreement does not prove alignment: check playback, cues and grids in Rekordbox,
+especially for another encode or format. This feature does not shift cues or
+regenerate waveforms/grids. Test representative replacements first.
+
+Every apply creates a private `mcp-relink-backups` directory beside `master.db`,
+containing the encrypted database, existing WAL/SHM, playlist XML and affected
+analysis files, with SHA256 manifest and restore instructions. Backup failure
+prevents writes. A SQL failure rolls back SQL and restores analysis files.
+Cross-client relinking is serialized by a filesystem lock. These snapshots
+supplement a complete Rekordbox library backup; close Rekordbox and all MCP
+clients before a manual restore. Do not mix old analysis files with a new database.

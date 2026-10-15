@@ -1,0 +1,55 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index 83c24a0..bfec001 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -3,7 +3,7 @@
+ 
+ [project]
+ name = "pyrekordbox"
+-description = "Inofficial Python package for interacting with the library of Pioneers Rekordbox DJ software."
++description = "Unofficial Python package for interacting with the library of Pioneer's rekordbox DJ software."
+ readme = "README.md"
+ authors = [
+     {name = "Dylan Jones", email = "dylanljones94@gmail.com"},
+@@ -25,15 +25,16 @@ classifiers = [
+     "Programming Language :: Python :: 3.10",
+     "Programming Language :: Python :: 3.11",
+     "Programming Language :: Python :: 3.12",
++    "Programming Language :: Python :: 3.13",
+     "Topic :: Multimedia :: Sound/Audio",
+ ]
+ requires-python = ">=3.8"
+ dependencies = [
+     "bidict>=0.21.0",
+     "construct>=2.10.0",
+-    "numpy>=1.19.0",
++    "numpy>=2.3",
+     "packaging",
+-    "psutil>=5.9.0",
++    "psutil>=7",
+     "sqlalchemy>=2.0.0",
+     "sqlcipher3-wheels",
+     "python-dateutil",
+@@ -42,7 +43,7 @@ dependencies = [
+ [project.optional-dependencies]
+ test = [
+     "hypothesis>=6.0.0",
+-    "pytest>=6.2.0",
++    "pytest>=9",
+     "pytest-cov",
+ ]
+ 
+@@ -56,9 +57,8 @@ Tracker = "https://github.com/dylanljones/pyrekordbox/issues"
+ 
+ [build-system]
+ requires = [
+-    "setuptools >= 61.0.0",
+-    "setuptools_scm[toml] >= 4",
+-    "setuptools_scm_git_archive",
++    "setuptools >= 80",
++    "setuptools_scm[toml] >= 9",
+     "wheel >= 0.37.0",
+ ]
+ build-backend = "setuptools.build_meta"
+
+

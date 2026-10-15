@@ -54,16 +54,17 @@ class RekordboxDatabase:
             if database_path:
                 self.database_path = database_path
                 logger.info(f"Connecting to rekordbox database at: {database_path}")
+            if database_path:
+                candidate = self.database_path / "master.db"
+                if not candidate.is_file():
+                    candidate = self.database_path / "rekordbox" / "master.db"
+                self.db = Rekordbox6Database(path=str(candidate), db_dir=str(candidate.parent))
             else:
-                self.database_path = self._detect_database_path()
-                logger.info(
-                    f"Auto-detected rekordbox database at: {self.database_path}"
-                )
-
-            if self.database_path:
-                self.db = Rekordbox6Database(db_dir=str(self.database_path))
-            else:
+                # pyrekordbox reads masterDbDirectory from Rekordbox settings;
+                # honor relocated libraries instead of forcing ~/Library/Pioneer.
                 self.db = Rekordbox6Database()
+            self.database_path = Path(self.db.db_directory)
+            logger.info(f"Connected database directory: {self.database_path}")
 
             content = self.db.get_content()
             content_count = len(list(content))

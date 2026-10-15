@@ -5,6 +5,8 @@ A FastMCP-based server for rekordbox database management with real-time database
 """
 
 import asyncio
+import os
+from functools import wraps
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -13,6 +15,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from .database import RekordboxDatabase
+from .relink import RelinkReplacement, find_candidates, inspect_audio, relink, library_lock, require_closed
 from .models import (
     Track,
     Playlist,
@@ -29,6 +32,27 @@ mcp = FastMCP("Rekordbox Database MCP Server")
 # Global database instance
 db: Optional[RekordboxDatabase] = None
 _db_initialized = False
+_relink_lock = asyncio.Lock()
+_database_tool_lock = asyncio.Lock()
+
+
+def database_tool(*args, **kwargs):
+    """Serialize tools sharing the ORM session; coordinate writers across clients."""
+    mutations = {"create_playlist", "add_tracks_to_playlist", "add_track_to_playlist",
+                 "remove_track_from_playlist", "delete_playlist", "import_track",
+                 "import_tracks", "cleanup_orphaned_playlist_entries", "remove_broken_tracks"}
+    def decorate(function):
+        @wraps(function)
+        async def serialized(*call_args, **call_kwargs):
+            async with _database_tool_lock:
+                if function.__name__ in mutations:
+                    await ensure_database_connected()
+                    with library_lock(db.db):
+                        require_closed()
+                        return await function(*call_args, **call_kwargs)
+                return await function(*call_args, **call_kwargs)
+        return mcp.tool(*args, **kwargs)(serialized)
+    return decorate
 
 
 class ServerConfig(BaseModel):
@@ -45,7 +69,7 @@ class ServerConfig(BaseModel):
     )
 
 
-@mcp.tool()
+@database_tool()
 async def search_tracks(
     query: str = "",
     artist: Optional[str] = None,
@@ -92,7 +116,7 @@ async def search_tracks(
     return [track.model_dump() for track in tracks]
 
 
-@mcp.tool()
+@database_tool()
 async def get_track_details(track_id: str) -> Dict[str, Any]:
     """
     Get detailed information about a specific track.
@@ -112,7 +136,7 @@ async def get_track_details(track_id: str) -> Dict[str, Any]:
     return track.model_dump()
 
 
-@mcp.tool()
+@database_tool()
 async def get_tracks_by_key(key: str) -> List[Dict[str, Any]]:
     """
     Get all tracks in a specific musical key.
@@ -130,7 +154,7 @@ async def get_tracks_by_key(key: str) -> List[Dict[str, Any]]:
     return [track.model_dump() for track in tracks]
 
 
-@mcp.tool()
+@database_tool()
 async def get_tracks_by_bpm_range(
     bpm_min: float, bpm_max: float
 ) -> List[Dict[str, Any]]:
@@ -151,7 +175,7 @@ async def get_tracks_by_bpm_range(
     return [track.model_dump() for track in tracks]
 
 
-@mcp.tool()
+@database_tool()
 async def get_genre_filepaths(genre: str) -> List[str]:
     """
     Get filepaths for all tracks matching a genre.
@@ -171,7 +195,7 @@ async def get_genre_filepaths(genre: str) -> List[str]:
     return filepaths
 
 
-@mcp.tool()
+@database_tool()
 async def get_most_played_tracks(limit: int = 20) -> List[Dict[str, Any]]:
     """
     Get the most played tracks in the library.
@@ -188,7 +212,7 @@ async def get_most_played_tracks(limit: int = 20) -> List[Dict[str, Any]]:
     return [track.model_dump() for track in tracks]
 
 
-@mcp.tool()
+@database_tool()
 async def get_top_rated_tracks(limit: int = 20) -> List[Dict[str, Any]]:
     """
     Get the highest rated tracks in the library.
@@ -205,7 +229,7 @@ async def get_top_rated_tracks(limit: int = 20) -> List[Dict[str, Any]]:
     return [track.model_dump() for track in tracks]
 
 
-@mcp.tool()
+@database_tool()
 async def get_unplayed_tracks(limit: int = 50) -> List[Dict[str, Any]]:
     """
     Get tracks that have never been played.
@@ -222,7 +246,7 @@ async def get_unplayed_tracks(limit: int = 50) -> List[Dict[str, Any]]:
     return [track.model_dump() for track in tracks]
 
 
-@mcp.tool()
+@database_tool()
 async def get_track_file_path(track_id: str) -> Dict[str, str]:
     """
     Get the file system path for a specific track.
@@ -246,7 +270,7 @@ async def get_track_file_path(track_id: str) -> Dict[str, str]:
     }
 
 
-@mcp.tool()
+@database_tool()
 async def search_tracks_by_filename(filename: str) -> List[Dict[str, Any]]:
     """
     Search for tracks by filename.
@@ -263,7 +287,7 @@ async def search_tracks_by_filename(filename: str) -> List[Dict[str, Any]]:
     return [track.model_dump() for track in tracks]
 
 
-@mcp.tool()
+@database_tool()
 async def analyze_library(
     group_by: str = "genre", aggregate_by: str = "count", top_n: int = 10
 ) -> Dict[str, Any]:
@@ -284,7 +308,7 @@ async def analyze_library(
     return analysis
 
 
-@mcp.tool()
+@database_tool()
 async def validate_track_ids(track_ids: List[str]) -> Dict[str, Any]:
     """
     Validate a list of track IDs and show which are valid/invalid.
@@ -301,7 +325,7 @@ async def validate_track_ids(track_ids: List[str]) -> Dict[str, Any]:
     return validation
 
 
-@mcp.tool()
+@database_tool()
 async def get_playlists() -> List[Dict[str, Any]]:
     """
     Get all playlists from the rekordbox database.
@@ -315,7 +339,7 @@ async def get_playlists() -> List[Dict[str, Any]]:
     return [playlist.model_dump() for playlist in playlists]
 
 
-@mcp.tool()
+@database_tool()
 async def get_playlist_tracks(playlist_id: str) -> List[Dict[str, Any]]:
     """
     Get all tracks in a specific playlist.
@@ -332,7 +356,7 @@ async def get_playlist_tracks(playlist_id: str) -> List[Dict[str, Any]]:
     return [track.model_dump() for track in tracks]
 
 
-@mcp.tool()
+@database_tool()
 async def get_library_stats() -> Dict[str, Any]:
     """
     Get comprehensive library statistics.
@@ -346,7 +370,7 @@ async def get_library_stats() -> Dict[str, Any]:
     return stats.model_dump()
 
 
-@mcp.tool()
+@database_tool()
 async def connect_database(database_path: Optional[str] = None) -> Dict[str, str]:
     """
     Connect to the rekordbox database.
@@ -357,12 +381,15 @@ async def connect_database(database_path: Optional[str] = None) -> Dict[str, str
     Returns:
         Connection status message
     """
-    global db
+    global db, _db_initialized
 
     try:
+        if db:
+            await db.disconnect()
         db = RekordboxDatabase()
         path = Path(database_path) if database_path else None
         await db.connect(database_path=path)
+        _db_initialized = True
 
         return {
             "status": "success",
@@ -370,11 +397,12 @@ async def connect_database(database_path: Optional[str] = None) -> Dict[str, str
             "total_tracks": str(await db.get_track_count()),
         }
     except Exception as e:
+        _db_initialized = False
         logger.error(f"Failed to connect to database: {e}")
         return {"status": "error", "message": f"Failed to connect: {str(e)}"}
 
 
-@mcp.tool()
+@database_tool()
 async def get_history_sessions(
     include_folders: bool = False, limit: int = 100
 ) -> List[Dict[str, Any]]:
@@ -396,7 +424,7 @@ async def get_history_sessions(
     return [session.model_dump() for session in sessions[:limit]]
 
 
-@mcp.tool()
+@database_tool()
 async def get_session_tracks(session_id: str) -> List[Dict[str, Any]]:
     """
     Get all tracks from a specific DJ history session.
@@ -413,7 +441,7 @@ async def get_session_tracks(session_id: str) -> List[Dict[str, Any]]:
     return [track.model_dump() for track in tracks]
 
 
-@mcp.tool()
+@database_tool()
 async def get_recent_sessions(days: int = 30) -> List[Dict[str, Any]]:
     """
     Get recent DJ history sessions within the specified number of days.
@@ -443,7 +471,7 @@ async def get_recent_sessions(days: int = 30) -> List[Dict[str, Any]]:
     return [session.model_dump() for session in recent_sessions]
 
 
-@mcp.tool()
+@database_tool()
 async def get_history_stats() -> Dict[str, Any]:
     """
     Get comprehensive statistics about DJ history sessions.
@@ -457,7 +485,7 @@ async def get_history_stats() -> Dict[str, Any]:
     return stats.model_dump()
 
 
-@mcp.tool()
+@database_tool()
 async def search_history_sessions(
     query: str = "",
     year: Optional[str] = None,
@@ -515,7 +543,7 @@ async def search_history_sessions(
 # Playlist Mutation Tools (with safety annotations)
 
 
-@mcp.tool(
+@database_tool(
     annotations={
         "readOnlyHint": False,
         "destructiveHint": False,
@@ -557,7 +585,7 @@ async def create_playlist(
         return {"status": "error", "message": f"Failed to create playlist: {str(e)}"}
 
 
-@mcp.tool(
+@database_tool(
     annotations={
         "readOnlyHint": False,
         "destructiveHint": False,
@@ -604,7 +632,7 @@ async def add_tracks_to_playlist(
         }
 
 
-@mcp.tool(
+@database_tool(
     annotations={
         "readOnlyHint": False,
         "destructiveHint": False,
@@ -644,7 +672,7 @@ async def add_track_to_playlist(playlist_id: str, track_id: str) -> Dict[str, An
         }
 
 
-@mcp.tool(
+@database_tool(
     annotations={
         "readOnlyHint": False,
         "destructiveHint": False,
@@ -687,7 +715,7 @@ async def remove_track_from_playlist(playlist_id: str, track_id: str) -> Dict[st
         }
 
 
-@mcp.tool(
+@database_tool(
     annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True}
 )
 async def delete_playlist(playlist_id: str) -> Dict[str, Any]:
@@ -739,7 +767,7 @@ async def delete_playlist(playlist_id: str) -> Dict[str, Any]:
 # Import Tools
 
 
-@mcp.tool(
+@database_tool(
     annotations={
         "readOnlyHint": False,
         "destructiveHint": False,
@@ -801,7 +829,7 @@ async def import_track(
     return await db.import_track(path, metadata=metadata, auto_tag=auto_tag)
 
 
-@mcp.tool(
+@database_tool(
     annotations={
         "readOnlyHint": False,
         "destructiveHint": False,
@@ -843,10 +871,72 @@ async def import_tracks(
     )
 
 
+@database_tool(annotations={"readOnlyHint": True, "destructiveHint": False})
+async def inspect_audio_files(paths: List[str], fingerprint: bool = False) -> Dict[str, Any]:
+    """Inspect codec, duration, tags and SHA256; optionally compute Chromaprint.
+
+    Does not require a database. A lossless format does not prove a lossless
+    source. Fingerprints are evidence for manual comparison, not timing proof.
+    """
+    if not 1 <= len(paths) <= 100:
+        raise ValueError("Supply 1..100 audio paths")
+    results = []
+    for path in paths:
+        try:
+            results.append(await asyncio.to_thread(inspect_audio, path, fingerprint, True))
+        except Exception as exc:
+            results.append({"path": path, "error": str(exc)})
+    return {"files": results}
+
+
+@database_tool(annotations={"readOnlyHint": True, "destructiveHint": False})
+async def find_relink_candidates(
+    source_directories: List[str], track_ids: Optional[List[str]] = None,
+    top_n: int = 5, max_files: int = 50000,
+) -> Dict[str, Any]:
+    """Find differently named source files using tags, filenames and duration.
+
+    Defaults to missing tracks. Supply track_ids to also inspect existing tracks
+    for upgrades. Candidates are suggestions: ambiguous matches, alternate
+    edits and timing need review. Does not modify any track or source file.
+    """
+    await ensure_database_connected()
+    async with _relink_lock:
+        return await asyncio.to_thread(find_candidates, db.db, source_directories,
+                                       track_ids, top_n, max_files)
+
+
+@database_tool(annotations={"readOnlyHint": False, "destructiveHint": False})
+async def relink_tracks(
+    replacements: List[RelinkReplacement], dry_run: bool = True,
+    accept_timing_risk: bool = False, only_missing: bool = True,
+    duration_tolerance: float = 2.0,
+) -> Dict[str, Any]:
+    """Preview/apply selected replacements without deleting/re-importing tracks.
+
+    Always preview first. Pass preview's apply_replacements, including hashes,
+    to apply with dry_run=false. Rekordbox must be closed for writes. Existing
+    IDs, playlists, ratings, cues and beatgrids are retained; path references in
+    ANLZ files and physical file properties are updated. Different file formats
+    or unknown/different durations require accept_timing_risk=true. Matching
+    duration does not guarantee cue alignment: verify playback and grid/cues.
+    Database/WAL/SHM and affected ANLZ files are backed up, failing closed if
+    backup fails. A write failure rolls back SQL and restores affected ANLZ.
+    Set only_missing=false explicitly to upgrade a file that is still present.
+    """
+    await ensure_database_connected()
+    async with _relink_lock:
+        result = await asyncio.to_thread(relink, db.db, replacements, dry_run,
+                                        accept_timing_risk, only_missing, duration_tolerance)
+        if not dry_run:
+            db._invalidate_content_cache()
+        return result
+
+
 # Cleanup Tools
 
 
-@mcp.tool()
+@database_tool()
 async def find_broken_tracks() -> Dict[str, Any]:
     """
     Scan the library for broken tracks and orphaned playlist references.
@@ -865,7 +955,7 @@ async def find_broken_tracks() -> Dict[str, Any]:
     return await db.find_broken_tracks()
 
 
-@mcp.tool(
+@database_tool(
     annotations={
         "readOnlyHint": False,
         "destructiveHint": False,
@@ -890,7 +980,7 @@ async def cleanup_orphaned_playlist_entries() -> Dict[str, Any]:
     return await db.remove_orphaned_playlist_entries()
 
 
-@mcp.tool(
+@database_tool(
     annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True}
 )
 async def remove_broken_tracks(track_ids: List[str]) -> Dict[str, Any]:
@@ -940,7 +1030,8 @@ async def ensure_database_connected():
 
         try:
             db = RekordboxDatabase()
-            await db.connect()
+            await db.connect(database_path=Path(os.environ["REKORDBOX_DATABASE_PATH"])
+                             if os.environ.get("REKORDBOX_DATABASE_PATH") else None)
 
             track_count = await db.get_track_count()
             playlist_count = len(await db.get_playlists())
@@ -969,43 +1060,22 @@ async def ensure_database_connected():
 def main():
     """Main entry point for the MCP server."""
     import sys
-    import signal
     import asyncio
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Rekordbox database MCP server")
+    parser.add_argument("--database-path", help="Rekordbox database directory")
+    args = parser.parse_args()
+    if args.database_path:
+        os.environ["REKORDBOX_DATABASE_PATH"] = args.database_path
 
     # Configure logging
     logger.remove()
     logger.add(
-        sink=lambda msg: print(msg, end=""),
+        sink=sys.stderr,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | {message}",
         level="INFO",
     )
-
-    # Setup signal handlers for graceful shutdown
-    def signal_handler(signum, frame):
-        logger.info(f"Received signal {signum}, shutting down gracefully...")
-
-        # Cleanup database connection
-        global db
-        if db:
-            try:
-                # Use asyncio to call the async disconnect method
-                if hasattr(asyncio, "_get_running_loop"):
-                    try:
-                        loop = asyncio.get_running_loop()
-                        loop.create_task(db.disconnect())
-                    except RuntimeError:
-                        # No running loop, create one
-                        asyncio.run(db.disconnect())
-                else:
-                    asyncio.run(db.disconnect())
-            except Exception as e:
-                logger.warning(f"Error during database cleanup: {e}")
-
-        sys.exit(0)
-
-    # Register signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
 
     try:
         # Run the FastMCP server (database will be initialized on first tool call)

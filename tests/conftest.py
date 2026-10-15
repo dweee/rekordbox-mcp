@@ -231,4 +231,5 @@ def database(mock_db, tmp_path):
     rdb.db = mock_db
     rdb._connected = True
     rdb.database_path = tmp_path
+    mock_db.db_directory = tmp_path
     return rdb

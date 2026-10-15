@@ -145,3 +145,15 @@ library_*.xml
 # Local Claude settings
 .claude/settings.local.json
 .claude/project-summary.md
+# Local operator artifacts
+/VALIDATION.json
+/PROVENANCE.json
+/provenance.json
+/FORK.json
+/UPSTREAM.json
+/.codex/
+/.cursor/
+/.claude/
+/chat-history/
+/chat-histories/
+/*.jsonl
