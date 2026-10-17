@@ -57,7 +57,9 @@ publisher installs `attic-client` and its closure from cache.nixos.org before
 importing that data; source builds are forbidden in the publisher. It does not
 run any transferred program. Only the final publication step receives the token
 and passes the validated output roots to `ci/push-attic.py`.
-`attic push` includes their runtime closures. It does not upload the entire runner
+After import, official signatures are restored from `cache.nixos.org` before
+the token is supplied. Attic skips those already published upstream dependencies
+and uploads the custom outputs and remaining runtime dependencies. It does not upload the entire runner
 store, install deployment hooks or change fleet cache promotion rules.
 
 A temporary mode-0600 Attic configuration under the runner temporary directory
