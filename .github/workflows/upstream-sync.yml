@@ -14,7 +14,7 @@ jobs:
     with:
       tool-repository: dweee/dave-fork-ci
       tool-revision: b5ad6e59b40ac1602172981bd28109c61798709f
-      auto-merge: false
+      auto-merge: ${{ vars.FORK_CI_AUTO_MERGE == 'true' && vars.ATTIC_PUSH_ENABLED == 'true' }}
       cache: ${{ vars.ATTIC_PUSH_ENABLED == 'true' }}
       attic-endpoint: ${{ vars.ATTIC_ENDPOINT }}
       attic-cache: ${{ vars.ATTIC_CACHE }}

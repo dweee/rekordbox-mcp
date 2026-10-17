@@ -89,6 +89,9 @@ A separate trusted workflow copies successful package artifact ZIPs to the
 It verifies release asset sizes/checksums before deleting the duplicate Actions
 artifact. Backup copying has no Attic credentials and never runs package content.
 Large ZIPs are split into numbered parts below the release-asset size limit.
+Backup tags mark the default branch when the archive is published. The release
+notes, original workflow run and SHA in each asset name identify the built source;
+the automatic source ZIP/tarball attached by GitHub is not the package archive.
 
 Download that prerelease's assets with `gh release download packages-RUN_ID`.
 For split archives, concatenate the ordered `.zip.part-0000` files into the
