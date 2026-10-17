@@ -26,7 +26,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Check Attic publication handling without credentials
-        run: python3 ci/test-push-attic.py
+        run: |
+          python3 ci/test-push-attic.py
+          python3 ci/test-transfer-attic.py
       - id: matrix
         env:
           SELECTED_PACKAGE: ${{ inputs.package }}
@@ -73,21 +75,66 @@ jobs:
             echo "Package build: ${SECONDS}s"
             cat outputs.txt
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Install the pinned Attic client
-        id: attic
+      - name: Export selected runtime closures for the isolated publisher
         if: ${{ vars.ATTIC_PUSH_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        timeout-minutes: 15
+        env:
+          ATTIC_MAX_CLOSURE_MIB: ${{ vars.ATTIC_MAX_CLOSURE_MIB || '2048' }}
+        run: python3 ci/transfer-attic.py export --directory attic-transfer
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ vars.ATTIC_PUSH_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        with:
+          name: nix-${{ matrix.system }}-${{ matrix.package }}-${{ github.sha }}
+          path: attic-transfer/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+          overwrite: false
+  publish:
+    needs: [plan, build]
+    if: ${{ vars.ATTIC_PUSH_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    name: Publish ${{ matrix.package }} (${{ matrix.system }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: nixbuild/nix-quick-install-action@9f63be77f412a248c9d9a65a4c82cf066cdf8f0c # v35
+        with:
+          nix_version: "2.34.7"
+          enable_kvm: false
+          nix_conf: |
+            experimental-features = nix-command flakes
+            accept-flake-config = false
+            substituters = https://cache.nixos.org/
+            extra-substituters =
+      - name: Install the trusted pinned Attic client before importing build data
+        id: attic
         timeout-minutes: 15
         run: |
           set -euo pipefail
-          client=$(nix build --inputs-from . 'nixpkgs#attic-client' --no-write-lock-file --no-link --print-out-paths)
+          client=$(nix build --inputs-from . 'nixpkgs#attic-client' --no-write-lock-file --no-link --print-out-paths --max-jobs 0 --builders "")
           test -x "$client/bin/attic"
           echo "binary=$client/bin/attic" >> "$GITHUB_OUTPUT"
-      - name: Publish successful package outputs to Attic
-        if: ${{ vars.ATTIC_PUSH_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: nix-${{ matrix.system }}-${{ matrix.package }}-${{ github.sha }}
+          path: attic-transfer
+      - name: Import data without running any package programs
+        timeout-minutes: 15
+        env:
+          ATTIC_MAX_CLOSURE_MIB: ${{ vars.ATTIC_MAX_CLOSURE_MIB || '2048' }}
+        run: python3 ci/transfer-attic.py import --directory attic-transfer
+      - name: Publish imported package outputs to Attic
         timeout-minutes: 30
         env:
           ATTIC_BIN: ${{ steps.attic.outputs.binary }}
           ATTIC_ENDPOINT: ${{ vars.ATTIC_ENDPOINT }}
           ATTIC_CACHE: ${{ vars.ATTIC_CACHE }}
           ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
-        run: python3 ci/push-attic.py --outputs outputs.txt
+        run: python3 ci/push-attic.py --outputs attic-transfer/outputs.txt

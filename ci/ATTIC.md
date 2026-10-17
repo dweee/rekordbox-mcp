@@ -51,8 +51,13 @@ branch remain build-only. A failed build never reaches publication. Enabling
 uploads with missing/invalid settings or a failed Attic upload fails the job;
 there is no success claim or silent fallback for a package that was not cached.
 
-The workflow installs `attic-client` from that repository's locked nixpkgs input,
-then passes only `nix build --print-out-paths` output roots to `ci/push-attic.py`.
+The build job never receives an Attic upload credential. It exports only the
+selected output closures as NAR data into an immutable artifact named for the
+platform, package and source commit, retained for one day. A separate disposable
+publisher installs `attic-client` and its closure from cache.nixos.org before
+importing that data; source builds are forbidden in the publisher. It does not
+run any transferred program. Only the final publication step receives the token
+and passes the validated output roots to `ci/push-attic.py`.
 `attic push` includes their runtime closures. It does not upload the entire runner
 store, install deployment hooks or change fleet cache promotion rules.
 
@@ -63,7 +68,11 @@ after both successful and failed uploads. No token enters Nix configuration,
 Nix derivations, Git files or artifacts.
 
 Build summaries record package build duration and successful upload duration.
-The publication step has a 30-minute timeout within the existing job timeout.
+The publisher is a separate job with a 45-minute timeout; upload has a 30-minute
+timeout. NAR export/import is bounded to 2 GiB of uncompressed data by default.
+Variable `ATTIC_MAX_CLOSURE_MIB` can explicitly select 1–4096 MiB. Oversize
+closures fail before publication; measure artifact storage, transfer time and
+runner disk use during the first pilot before raising the cap.
 There are no automatic retries of authentication or other upload failures.
 
 A successful upload does not prove a later machine can substitute the package:
