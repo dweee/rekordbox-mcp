@@ -29,6 +29,8 @@ Configure the following in each repository that will run package jobs:
 An administrator can issue that scoped token on the Attic server with
 `atticadm make-token --sub github-packages --validity 90d --pull CACHE --push CACHE`.
 Keep the result private and enter it using the hosting service's secret UI.
+Use a candidate/staging cache; production promotion remains a separate trusted
+local operation. Do not supply a production or personal-cache write token.
 No existing host credentials are copied into the repositories. The upload token
 will be available to GitHub's runner when the publication step goes live.
 
@@ -53,7 +55,7 @@ there is no success claim or silent fallback for a package that was not cached.
 
 The build job never receives an Attic upload credential. It exports only the
 selected output closures as NAR data into an immutable artifact named for the
-platform, package and source commit, retained for one day. A separate disposable
+platform, package and source commit, retained for one day. A separate disposable Linux
 publisher installs `attic-client` and its closure from cache.nixos.org before
 importing that data; source builds are forbidden in the publisher. It does not
 run any transferred program. Only the final publication step receives the token

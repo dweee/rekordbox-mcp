@@ -94,7 +94,7 @@ jobs:
     needs: [plan, build]
     if: ${{ vars.ATTIC_PUSH_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     name: Publish ${{ matrix.package }} (${{ matrix.system }})
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
