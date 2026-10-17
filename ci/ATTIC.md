@@ -1,15 +1,14 @@
-# Inactive package builders and Attic publication
+# Package builders and Attic publication
 
-These workflows remain under `ci/disabled/`, outside recognized workflow
-locations. Forgejo Actions is disabled. Preparing this integration does not run
-builds, upload packages, create caches, change credentials or activate machines.
+Native build workflows are installed in `.github/workflows/`. Every successful
+build uploads a Nix runtime-closure archive before any cache publisher runs.
+Archives remain downloadable for one day whether uploads are disabled or fail.
 
 ## Installer and platform support
 
-All drafts use `nixbuild/nix-quick-install-action` v35, pinned to commit
+All builders use `nixbuild/nix-quick-install-action` v35, pinned to commit
 `9f63be77f412a248c9d9a65a4c82cf066cdf8f0c`, and explicitly select Nix 2.34.7.
-This action installs single-user Nix on GitHub-hosted runners. These drafts
-are intended for GitHub-hosted Apple Silicon macOS and x86/ARM Linux after
+This action installs single-user Nix on GitHub-hosted runners. The workflows run on GitHub-hosted Apple Silicon macOS and x86/ARM Linux after
 publication, rather than existing self-hosted Forgejo workers.
 
 Source: https://github.com/nixbuild/nix-quick-install-action/tree/9f63be77f412a248c9d9a65a4c82cf066cdf8f0c
@@ -40,15 +39,13 @@ entries. Configure both for an anonymously readable cache. Private cache reads
 are not configured here; no write token is exposed to the build step. Without
 these variables builds read from cache.nixos.org and still upload to Attic.
 
-Move only the approved workflow drafts into `.github/workflows/` when ready.
 Dispatch a manual run on the repository's default branch, selecting one package
 for the first timing and end-to-end cache check. Application forks own their
-own jobs; the catalog excludes their aliases. The catalog's private Forgejo
-inputs must be replaced with approved public sources before a public GitHub run.
+own jobs; the catalog excludes their aliases. The catalog uses pinned public fork inputs.
 
 ## Publication behavior
 
-Only successful manual runs on the default branch can upload. Builds on another
+Only successful push/manual runs on the default branch can upload. Builds on another
 branch remain build-only. A failed build never reaches publication. Enabling
 uploads with missing/invalid settings or a failed Attic upload fails the job;
 there is no success claim or silent fallback for a package that was not cached.
@@ -71,7 +68,7 @@ Nix derivations, Git files or artifacts.
 
 Build summaries record package build duration and successful upload duration.
 The publisher is a separate job with a 45-minute timeout; upload has a 30-minute
-timeout. NAR export/import is bounded to 2 GiB of uncompressed data by default.
+timeout. NAR export/import is bounded to 4 GiB of uncompressed data by default.
 Variable `ATTIC_MAX_CLOSURE_MIB` can explicitly select 1–4096 MiB. Oversize
 closures fail before publication; measure artifact storage, transfer time and
 runner disk use during the first pilot before raising the cap.
