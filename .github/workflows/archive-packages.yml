@@ -17,11 +17,12 @@ jobs:
       (github.event_name == 'workflow_dispatch' ||
        (github.event.workflow_run.head_repository.full_name == github.repository &&
         github.event.workflow_run.head_branch == github.event.repository.default_branch &&
-        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')))
+        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch' ||
+        github.event.workflow_run.event == 'schedule' || github.event.workflow_run.event == 'repository_dispatch')))
     permissions:
       contents: write
       actions: write
-    uses: dweee/dave-fork-ci/.github/workflows/archive-packages.yml@b0474aa78bc4a5726d45822b1801ee3236bb891c
+    uses: dweee/dave-fork-ci/.github/workflows/archive-packages.yml@f506348a154600abbbc53025c39b14020b014e7d
     with:
       run-id: ${{ format('{0}', github.event.workflow_run.id || inputs.run-id) }}
-      tool-revision: b0474aa78bc4a5726d45822b1801ee3236bb891c
+      tool-revision: f506348a154600abbbc53025c39b14020b014e7d

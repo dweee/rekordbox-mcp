@@ -10,10 +10,10 @@ jobs:
   upstream:
     permissions:
       contents: write
-    uses: dweee/dave-fork-ci/.github/workflows/upstream-sync.yml@b0474aa78bc4a5726d45822b1801ee3236bb891c
+    uses: dweee/dave-fork-ci/.github/workflows/upstream-sync.yml@f506348a154600abbbc53025c39b14020b014e7d
     with:
       tool-repository: dweee/dave-fork-ci
-      tool-revision: b0474aa78bc4a5726d45822b1801ee3236bb891c
+      tool-revision: f506348a154600abbbc53025c39b14020b014e7d
       auto-merge: ${{ vars.FORK_CI_AUTO_MERGE == 'true' && vars.ATTIC_PUSH_ENABLED == 'true' }}
       cache: ${{ vars.ATTIC_PUSH_ENABLED == 'true' }}
       attic-endpoint: ${{ vars.ATTIC_ENDPOINT }}
