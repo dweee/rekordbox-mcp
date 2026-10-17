@@ -81,3 +81,19 @@ inputs and recipes. No fleet configuration is changed by these workflows.
 
 Reference CLI behavior: https://docs.attic.rs/reference/attic-cli.html
 Token scopes: https://docs.attic.rs/reference/atticadm-cli.html
+
+## Recover a package without rebuilding
+
+A separate trusted workflow copies successful package artifact ZIPs to the
+`packages-RUN_ID` prerelease, independently of the build's final status or Attic.
+It verifies release asset sizes/checksums before deleting the duplicate Actions
+artifact. Backup copying has no Attic credentials and never runs package content.
+Large ZIPs are split into numbered parts below the release-asset size limit.
+
+Download that prerelease's assets with `gh release download packages-RUN_ID`.
+For split archives, concatenate the ordered `.zip.part-0000` files into the
+original `.zip`, then verify its `.sha256` file. Unzip it and verify `SHA256SUMS`.
+Restore its runtime closure with `gzip -dc closure.nar.gz | nix-store --import`;
+then use `outputs.txt` with the Attic publisher after cache access is repaired.
+The `Preserve package backups` workflow can also be dispatched manually with an
+older run ID while its original Actions artifacts are still available.
