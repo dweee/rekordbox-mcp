@@ -10,10 +10,10 @@ jobs:
   upstream:
     permissions:
       contents: write
-    uses: YOUR-GITHUB-OWNER/dave-fork-ci/.github/workflows/upstream-sync.yml@d59aa8891abfbfe4a3f3e17e958d924c1082aaa4
+    uses: YOUR-GITHUB-OWNER/dave-fork-ci/.github/workflows/upstream-sync.yml@ddb58394544f30eac7da69ba9ddd16be65d47586
     with:
       tool-repository: YOUR-GITHUB-OWNER/dave-fork-ci
-      tool-revision: d59aa8891abfbfe4a3f3e17e958d924c1082aaa4
+      tool-revision: ddb58394544f30eac7da69ba9ddd16be65d47586
       auto-merge: true
       cache: true
       attic-endpoint: ${{ vars.ATTIC_ENDPOINT }}
