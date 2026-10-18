@@ -1,104 +1,113 @@
-# Package builders and Attic publication
+# Private Flakey cache publication
 
-Native build workflows are installed in `.github/workflows/`. Every successful
-build uploads a Nix runtime-closure archive before any cache publisher runs.
-Archives remain downloadable for one day whether uploads are disabled or fail.
+The catalog and five application forks publish free, disc-independent package
+closures to **https://attic.monke.fail/flakey**, a private Attic cache. Its signing
+key is `flakey:mDx4DiNpH5w1Pl8OAKFFWq1ZsypA9lbaFKNiRWhqYE8=`.
+There is one destination. Publisher helpers reject any other endpoint or cache.
 
-## Installer and platform support
+## Repository setup
 
-All builders use `nixbuild/nix-quick-install-action` v35, pinned to commit
-`9f63be77f412a248c9d9a65a4c82cf066cdf8f0c`, and explicitly select Nix 2.34.7.
-This action installs single-user Nix on GitHub-hosted runners. The workflows run on GitHub-hosted Apple Silicon macOS and x86/ARM Linux after
-publication, rather than existing self-hosted Forgejo workers.
+An Attic administrator issues a dedicated token with only pull and push on
+`flakey`, valid for at most 90 days:
 
-Source: https://github.com/nixbuild/nix-quick-install-action/tree/9f63be77f412a248c9d9a65a4c82cf066cdf8f0c
+```sh
+atticadm make-token --sub github-packages --validity 90d --pull flakey --push flakey
+```
 
-## Configure at go-live
+Save the token privately to a file; do not paste it into commands, logs or Git.
+On a machine with authenticated GitHub CLI, set the existing secret and enable
+variables. This reads the token directly from the file without printing it:
 
-Configure the following in each repository that will run package jobs:
+```sh
+token_file=/absolute/path/to/github-flakey-token
+for repo in dave-packages kopuz paneru tabrix schildi-revenge rekordbox-mcp; do
+  gh secret set ATTIC_TOKEN --repo "dweee/$repo" < "$token_file"
+  gh variable set ATTIC_ENDPOINT --repo "dweee/$repo" --body https://attic.monke.fail
+  gh variable set ATTIC_CACHE --repo "dweee/$repo" --body flakey
+  gh variable set ATTIC_SUBSTITUTER --repo "dweee/$repo" --body https://attic.monke.fail/flakey
+  gh variable set ATTIC_PUBLIC_KEY --repo "dweee/$repo" --body 'flakey:mDx4DiNpH5w1Pl8OAKFFWq1ZsypA9lbaFKNiRWhqYE8='
+  gh variable set ATTIC_PUSH_ENABLED --repo "dweee/$repo" --body true
+  if test "$repo" = dave-packages; then
+    gh variable set DAVE_PACKAGES_CI_ENABLED --repo "dweee/$repo" --body true
+  else
+    gh variable set DAVE_FORK_CI_ENABLED --repo "dweee/$repo" --body true
+    gh variable set GUARDED_UPSTREAM_SYNC_ENABLED --repo "dweee/$repo" --body false
+  fi
+done
+```
 
-* The workflow's existing CI enable variable: `DAVE_PACKAGES_CI_ENABLED=true`
-  in the catalog, or `DAVE_FORK_CI_ENABLED=true` in application forks.
-* Variable `ATTIC_PUSH_ENABLED=true` to publish successful builds.
-* Variable `ATTIC_ENDPOINT`: the HTTPS URL of your existing Attic server.
-* Variable `ATTIC_CACHE`: the existing cache name, without a server prefix.
-* Secret `ATTIC_TOKEN`: a dedicated, expiring token scoped to pull/push that
-  cache. It does not need cache creation, configuration, deletion or admin rights.
+Endpoint/cache/key variables are also set for compatibility with existing repo
+administration. The native publisher and read helper pin the values above.
+Rotate the secret before its token expires. No host credential is reused.
 
-An administrator can issue that scoped token on the Attic server with
-`atticadm make-token --sub github-packages --validity 90d --pull CACHE --push CACHE`.
-Keep the result private and enter it using the hosting service's secret UI.
-Use a candidate/staging cache; production promotion remains a separate trusted
-local operation. Do not supply a production or personal-cache write token.
-No existing host credentials are copied into the repositories. The upload token
-will be available to GitHub's runner when the publication step goes live.
+## Trusted reads and writes
 
-Optional variables `ATTIC_SUBSTITUTER` (the cache's public Nix substituter URL)
-and `ATTIC_PUBLIC_KEY` (its public signing key) let builds reuse existing cache
-entries. Configure both for an anonymously readable cache. Private cache reads
-are not configured here; no write token is exposed to the build step. Without
-these variables builds read from cache.nixos.org and still upload to Attic.
+Only a push or manual dispatch on the repository's default branch receives the
+secret. The read helper creates `$RUNNER_TEMP/flakey-attic.netrc` with mode 0600
+and configures Nix's `netrc-file`; the token does not enter Nix expressions,
+derivations, the store or artifacts. The netrc authenticates to `attic.monke.fail`.
+Pull request and other-branch builds read the official upstream cache and receive
+no Attic token. They cannot publish. CI enable switches remain respected.
 
-Dispatch a manual run on the repository's default branch, selecting one package
-for the first timing and end-to-end cache check. Application forks own their
-own jobs; the catalog excludes their aliases. The catalog uses pinned public fork inputs.
+Native builders use the pinned Nix quick installer with Nix 2.34.7 on
+`ubuntu-24.04`, `ubuntu-24.04-arm`, and `macos-15`. Linux kernel builders reclaim
+unused .NET, Android and GHC SDK space and allow up to six hours per package.
+The catalog builds one package per matrix job, rather than a complete host.
 
-## Publication behavior
+Only successful default-branch push/dispatch runs enter the separate publisher.
+It installs the pinned Attic client from the official cache with local builds
+disabled, imports selected NAR data without executing it, verifies the runtime
+closure, restores upstream signatures, then pushes roots and runtime closures.
+The token is stored in a temporary mode-0600 Attic configuration, removed from
+the client's environment, never passed in command arguments, and removed after
+success or failure. Failed publication fails the job.
 
-Only successful push/manual runs on the default branch can upload. Builds on another
-branch remain build-only. A failed build never reaches publication. Enabling
-uploads with missing/invalid settings or a failed Attic upload fails the job;
-there is no success claim or silent fallback for a package that was not cached.
+The four shared upstream synchronization jobs are paused behind
+`GUARDED_UPSTREAM_SYNC_ENABLED` (unset or false): their pinned shared
+controller builds with public logs and exports public closure artifacts without
+this migration's recursive policy. They receive no Attic secret and have cache
+publication disabled. Resume them only after the shared controller applies the
+same pre-build and export checks. Native PR/push/dispatch builds remain enabled;
+a merge to the default branch triggers the guarded native publisher.
 
-The build job never receives an Attic upload credential. It exports only the
-selected output closures as NAR data into an immutable artifact named for the
-platform, package and source commit, retained for one day. A separate disposable Linux
-publisher installs `attic-client` and its closure from cache.nixos.org before
-importing that data; source builds are forbidden in the publisher. It does not
-run any transferred program. Only the final publication step receives the token
-and passes the validated output roots to `ci/push-attic.py`.
-After import, official signatures are restored from `cache.nixos.org` before
-the token is supplied. Attic skips those already published upstream dependencies
-and uploads the custom outputs and remaining runtime dependencies. It does not upload the entire runner
-store, install deployment hooks or change fleet cache promotion rules.
+## Public build and backup policy
 
-A temporary mode-0600 Attic configuration under the runner temporary directory
-holds the step's token. The helper removes the token from the child environment,
-never passes it as a command argument, and removes the temporary configuration
-after both successful and failed uploads. No token enters Nix configuration,
-Nix derivations, Git files or artifacts.
+These repositories and their closure artifacts/releases are public. Before any
+package build with logs, `ci/public-closure.py` captures and inspects the entire
+recursive derivation graph. It rejects the disc input, VeraCrypt, proprietary
+NVIDIA 580, ffmpeg-full and subnetter, including transitive references. Failure
+prints a generic diagnostic without the rejected path or evaluator output.
+Nixpkgs is imported with `allowUnfree = false` as an independent evaluation gate.
 
-Build summaries record package build duration and successful upload duration.
-The publisher is a separate job with a 45-minute timeout; upload has a 30-minute
-timeout. NAR export/import is bounded to 4 GiB of uncompressed data by default.
-Variable `ATTIC_MAX_CLOSURE_MIB` can explicitly select 1–4096 MiB. Oversize
-closures fail before publication; measure artifact storage, transfer time and
-runner disk use during the first pilot before raising the cap.
-There are no automatic retries of authentication or other upload failures.
+Only these Wii attributes are approved, and each still requires the recursive
+derivation check: `wiicompiled-native-prebuilt`, `wiicompiled-translator`,
+`wiicompiled-setup`, and `wiicompiled-setup-unwrapped`. Final/translated/disc
+attributes are rejected before evaluation. Disc-dependent and unfree outputs
+remain on premises and may be stored only in the private cache.
 
-A successful upload does not prove a later machine can substitute the package:
-verify the same output store path is readable from the selected cache with the
-intended consumer credentials and signing-key trust. Consumers also need matching
-inputs and recipes. No fleet configuration is changed by these workflows.
+Immediately before any NAR archive is created, the export helper checks the
+selected outputs' complete runtime closure again. The publisher checks imported
+runtime closures before supplying the write credential. No job exports the
+whole runner store. Selected free closures are retained as immutable Actions
+artifacts for one day; the existing `Preserve package backups` workflow may
+copy those archives to public prereleases. These are public redistribution,
+which is why the closure policy runs before the archive exists.
 
-Reference CLI behavior: https://docs.attic.rs/reference/attic-cli.html
-Token scopes: https://docs.attic.rs/reference/atticadm-cli.html
+Transfers default to a maximum of 4 GiB uncompressed; `ATTIC_MAX_CLOSURE_MIB`
+accepts 1–4096 MiB. An oversize closure fails rather than silently dropping data.
+Build summaries show build and upload duration. Cache success still requires
+checking the consumer's exact output store path and authenticated narinfo URL.
 
-## Recover a package without rebuilding
+## Credential-free checks
 
-A separate trusted workflow copies successful package artifact ZIPs to the
-`packages-RUN_ID` prerelease, independently of the build's final status or Attic.
-It verifies release asset sizes/checksums before deleting the duplicate Actions
-artifact. Backup copying has no Attic credentials and never runs package content.
-Large ZIPs are split into numbered parts below the release-asset size limit.
-Backup tags mark the default branch when the archive is published. The release
-notes, original workflow run and SHA in each asset name identify the built source;
-the automatic source ZIP/tarball attached by GitHub is not the package archive.
+```sh
+python3 ci/test-push-attic.py
+python3 ci/test-transfer-attic.py
+python3 ci/test-public-closure.py
+python3 ci/test-configure-attic-read.py
+```
 
-Download that prerelease's assets with `gh release download packages-RUN_ID`.
-For split archives, concatenate the ordered `.zip.part-0000` files into the
-original `.zip`, then verify its `.sha256` file. Unzip it and verify `SHA256SUMS`.
-Restore its runtime closure with `gzip -dc closure.nar.gz | nix-store --import`;
-then use `outputs.txt` with the Attic publisher after cache access is repaired.
-The `Preserve package backups` workflow can also be dispatched manually with an
-older run ID while its original Actions artifacts are still available.
+To recover a permitted archive, download its `packages-RUN_ID` release assets,
+join any numbered ZIP parts, verify the supplied checksums, and import its NAR
+with `gzip -dc closure.nar.gz | nix-store --import`. Use `outputs.txt` as the
+publisher manifest after repairing cache access; reapply the runtime guard.
