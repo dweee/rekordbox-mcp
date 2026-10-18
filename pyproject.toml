@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "fastmcp>=2.11.0",
-    "pyrekordbox>=0.4.3",
+    "pyrekordbox>=0.5.0",
     "pydantic>=2.0.0",
     "loguru>=0.7.0",
     "mutagen>=1.47.0",

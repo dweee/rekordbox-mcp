@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from pyrekordbox import Rekordbox6Database
+from pyrekordbox import MasterDatabase as Rekordbox6Database
 from loguru import logger
 
 from .models import (

@@ -214,16 +214,19 @@ def test_two_clients_cannot_relink_concurrently(library, tmp_path):
 
 def test_pyrekordbox_real_schema_and_anlz_path_update(tmp_path, monkeypatch):
     """Exercise the pinned library's real path setter and USN registry/schema."""
-    from pyrekordbox import Rekordbox6Database
-    from pyrekordbox.db6 import tables
+    from pyrekordbox import MasterDatabase
+    from pyrekordbox.masterdb import models as tables
     from datetime import datetime, timezone
     engine = create_engine(f'sqlite:///{tmp_path / "master.db"}')
     tables.Base.metadata.create_all(engine)
     engine.dispose()
-    db = Rekordbox6Database(path=tmp_path / "master.db", db_dir=tmp_path, unlock=False)
+    db = MasterDatabase(path=tmp_path / "master.db", db_dir=tmp_path, unlock=False)
     analysis = tmp_path / "ANLZ.DAT"
     analysis.write_text('/missing/old.wav')
     class Analysis:
+        def get(self, key):
+            assert key == "path"
+            return analysis.read_text()
         def set_path(self, path):
             self.path = path
         def save(self, path):

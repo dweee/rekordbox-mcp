@@ -21,7 +21,7 @@ import unicodedata
 from mutagen import File as AudioFile
 from pydantic import BaseModel, ConfigDict
 from pyrekordbox.utils import get_rekordbox_pid
-from pyrekordbox.db6.tables import FileType
+from pyrekordbox.masterdb.models import FileType
 
 EXTENSIONS = {".mp3", ".m4a", ".flac", ".wav", ".aif", ".aiff"}
 TIMING_WARNING = (

@@ -15,7 +15,7 @@
 }:
 buildPythonPackage rec {
   pname = "pyrekordbox";
-  version = "0.4.4";
+  version = "0.5.0";
   format = "pyproject";
 
   src = fetchFromGitHub {
@@ -23,8 +23,8 @@ buildPythonPackage rec {
     repo = "pyrekordbox";
     rev = "v${version}";
     # To get the correct hash, you can run:
-    # nix-prefetch-url --unpack https://github.com/dylanljones/pyrekordbox/archive/refs/tags/v0.4.4.tar.gz
-    hash = "sha256-eOr48xAmW73HL/CQu4a10IEZ6okpixGWYWJdqzwxKPQ=";
+    # nix-prefetch-url --unpack https://github.com/dylanljones/pyrekordbox/archive/refs/tags/v0.5.0.tar.gz
+    hash = "sha256-1/yOjdHTDqwbuoBxsQtXfhNaId0cwUfGLmZ/lFkTAZU=";
   };
 
   patches = [
