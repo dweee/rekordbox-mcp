@@ -1,0 +1,18 @@
+{
+  "targets": {
+    "aarch64-darwin": [
+      {
+        "attribute": "packages.aarch64-darwin.rekordbox-mcp",
+        "visibility": "public"
+      }
+    ]
+  },
+  "excludedSystems": [],
+  "submodules": false,
+  "integrationInventory": false,
+  "version": 1,
+  "forge": "github",
+  "repository": "dweee/rekordbox-mcp",
+  "branch": "flakey",
+  "remote": "https://github.com/dweee/rekordbox-mcp.git"
+}

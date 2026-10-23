@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "checks": [],
+  "upstreams": [
+    {
+      "name": "davehenke/rekordbox-mcp",
+      "api": "https://api.github.com/repos/davehenke/rekordbox-mcp/releases/latest"
+    }
+  ]
+}
