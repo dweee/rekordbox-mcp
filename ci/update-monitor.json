@@ -4,7 +4,8 @@
   "upstreams": [
     {
       "name": "davehenke/rekordbox-mcp",
-      "api": "https://api.github.com/repos/davehenke/rekordbox-mcp/releases/latest"
+      "api": "https://api.github.com/repos/davehenke/rekordbox-mcp/commits/main",
+      "current": "d8dce67700911b6bef84b25c5f93ae07f200a1c5"
     }
   ]
 }
