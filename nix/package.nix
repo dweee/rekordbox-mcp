@@ -32,12 +32,13 @@ python3.pkgs.buildPythonApplication {
     "rekordbox_mcp.relink"
   ];
   makeWrapperArgs = [
-    "--prefix PATH : ${
-      lib.makeBinPath [
-        ffmpeg
-        chromaprint
-      ]
-    }"
+    "--prefix"
+    "PATH"
+    ":"
+    (lib.makeBinPath [
+      ffmpeg
+      chromaprint
+    ])
   ];
   meta = {
     description = "Rekordbox MCP with reviewed track relinking and audio inspection";

@@ -33,7 +33,7 @@ buildPythonPackage rec {
 
   # Since fetchFromGitHub does not include the .git directory,
   # setuptools-scm needs the version to be explicitly provided.
-  SETUPTOOLS_SCM_PRETEND_VERSION = version;
+  env.SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PYREKORDBOX = version;
 
   nativeBuildInputs = [
     setuptools
