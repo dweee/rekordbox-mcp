@@ -14,5 +14,9 @@
   "forge": "github",
   "repository": "dweee/rekordbox-mcp",
   "branch": "flakey",
-  "remote": "https://github.com/dweee/rekordbox-mcp.git"
+  "remote": "https://github.com/dweee/rekordbox-mcp.git",
+  "inputCheckWorkflows": [
+    "release-channels.yml",
+    "darwin-actions.yml"
+  ]
 }
