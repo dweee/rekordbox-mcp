@@ -9,9 +9,15 @@
       systems = [ "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
       packageFor = system:
-        let pkgs = import nixpkgs { inherit system; };
+        let
+          pkgs = import nixpkgs { inherit system; };
+          # FastMCP 3 still uses the SDK 1 API; nixpkgs retains it as mcp_1.
+          python = pkgs.python3.override {
+            packageOverrides = _final: prev: { mcp = prev.mcp_1; };
+          };
         in pkgs.callPackage ./nix/package.nix {
-          pyrekordbox = pkgs.python3Packages.callPackage ./nix/pyrekordbox {};
+          python3 = python;
+          pyrekordbox = python.pkgs.callPackage ./nix/pyrekordbox {};
         };
     in {
       packages = forAllSystems (system:
