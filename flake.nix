@@ -13,7 +13,7 @@
           pkgs = import nixpkgs { inherit system; };
           # FastMCP 3 still uses the SDK 1 API; nixpkgs retains it as mcp_1.
           python = pkgs.python3.override {
-            packageOverrides = _final: prev: { mcp = prev.mcp_1; };
+            packageOverrides = _final: prev: { mcp = prev.mcp_1 or prev.mcp; };
           };
         in pkgs.callPackage ./nix/package.nix {
           python3 = python;
