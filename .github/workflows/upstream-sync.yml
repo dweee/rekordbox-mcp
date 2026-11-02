@@ -12,9 +12,11 @@ jobs:
     if: ${{ vars.GUARDED_UPSTREAM_SYNC_ENABLED == 'true' }}
     permissions:
       contents: write
-    uses: dweee/dave-fork-ci/.github/workflows/upstream-sync.yml@4e20c93420c021485e733bc605d52e85ea15e07c
+      actions: write
+      checks: read
+    uses: dweee/dave-fork-ci/.github/workflows/upstream-sync.yml@a04b3a1df4290658ec41367a10faa058224314e9
     with:
       tool-repository: dweee/dave-fork-ci
-      tool-revision: 4e20c93420c021485e733bc605d52e85ea15e07c
+      tool-revision: a04b3a1df4290658ec41367a10faa058224314e9
       auto-merge: ${{ vars.FORK_CI_AUTO_MERGE == 'true' && vars.ATTIC_PUSH_ENABLED == 'true' }}
       cache: false
