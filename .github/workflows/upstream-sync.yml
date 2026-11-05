@@ -1,22 +1,24 @@
 name: Sync and test upstream
-'on':
+on:
   schedule:
-  - cron: 17 */6 * * *
-  workflow_dispatch: null
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
   repository_dispatch:
-    types:
-    - upstream-updated
+    types: [upstream-updated]
 permissions: {}
 jobs:
   upstream:
+    # The pinned controller keeps fork control files and checks public closures before build and export.
     if: ${{ vars.GUARDED_UPSTREAM_SYNC_ENABLED == 'true' }}
     permissions:
+      statuses: write
+      id-token: write
       contents: write
       actions: write
       checks: read
-    uses: dweee/dave-fork-ci/.github/workflows/upstream-sync.yml@6f4272f3fad36ebbe28dc00b57c5e318dde4924a
+    uses: dweee/dave-fork-ci/.github/workflows/upstream-sync.yml@02e78310f956195865c00ca4a887cc96b959d69e
     with:
       tool-repository: dweee/dave-fork-ci
-      tool-revision: 6f4272f3fad36ebbe28dc00b57c5e318dde4924a
+      tool-revision: 02e78310f956195865c00ca4a887cc96b959d69e
       auto-merge: ${{ vars.FORK_CI_AUTO_MERGE == 'true' && vars.ATTIC_PUSH_ENABLED == 'true' }}
       cache: false
