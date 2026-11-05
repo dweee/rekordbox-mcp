@@ -5,7 +5,7 @@ name: Verified release channels
     branches:
     - flakey
   schedule:
-  - cron: 35 2 * * *
+  - cron: 35 1 * * *
   workflow_dispatch:
     inputs:
       channel:
@@ -27,6 +27,8 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
     outputs:
       revision: ${{ steps.selection.outputs.revision }}
     steps:
@@ -76,6 +78,8 @@ jobs:
   build_aarch64_darwin:
     runs-on: macos-15
     timeout-minutes: 360
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
     needs:
     - test
     outputs:
@@ -119,6 +123,8 @@ jobs:
       env:
         ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN || secrets.FLAKEY_ATTIC_TOKEN }}
       run: python3 ci/configure-attic-read.py
+    - name: Install pinned Niks3 publisher
+      run: bash ci/install-niks3.sh
     - name: Build complete inventory, checkpoint closures, verify remote NAR bytes
       id: release
       env:
@@ -127,9 +133,14 @@ jobs:
     - name: Remove cache reader
       if: ${{ always() }}
       run: python3 ci/configure-attic-read.py --cleanup
+    permissions:
+      contents: read
+      id-token: write
   retain_aarch64_darwin:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
     if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/flakey'
       }}
     steps:
@@ -180,6 +191,8 @@ jobs:
   promote:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
     needs:
     - test
     - build_aarch64_darwin
