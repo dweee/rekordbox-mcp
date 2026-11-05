@@ -157,3 +157,4 @@ library_*.xml
 /chat-history/
 /chat-histories/
 /*.jsonl
+*.pyc
