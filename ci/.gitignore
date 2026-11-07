@@ -1,1 +1,3 @@
 __pycache__/
+!test-push-niks3.py
+!test-retain-build-outputs.py
