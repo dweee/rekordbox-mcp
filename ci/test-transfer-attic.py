@@ -79,13 +79,17 @@ class TransferSafetyTests(unittest.TestCase):
             with self.subTest(workflow=path.name):
                 build, separator, publisher = path.read_text().partition('\n  publish:\n')
                 self.assertTrue(separator)
-                self.assertIn('Configure authenticated private cache reads for trusted builds', build)
-                self.assertEqual(publisher.count('secrets.ATTIC_TOKEN'),1)
-                self.assertIn('needs: [plan, build]', publisher)
-                self.assertIn('--max-jobs 0 --builders', publisher)
+                self.assertIn('ci/configure-niks3.py --oidc', build)
+                self.assertNotIn('secrets.ATTIC_TOKEN', build + publisher)
+                self.assertNotIn('ci/push-niks3.py', build)
+                self.assertIn('id-token: write', publisher)
+                self.assertIn('    - plan\n    - build', publisher)
+                self.assertNotIn('nix build', publisher)
                 self.assertIn('github.event.repository.default_branch', publisher)
-                self.assertLess(publisher.index('Install the trusted pinned Attic client'), publisher.index('ci/transfer-attic.py import'))
-                self.assertLess(publisher.index('ci/transfer-attic.py import'), publisher.index('secrets.ATTIC_TOKEN'))
+                self.assertIn("github.event_name != 'pull_request'", publisher)
+                self.assertIn("github.event_name != 'pull_request_target'", publisher)
+                self.assertLess(publisher.index('ci/install-niks3.sh'), publisher.index('ci/transfer-attic.py import'))
+                self.assertLess(publisher.index('ci/transfer-attic.py import'), publisher.index('ci/push-niks3.py'))
                 self.assertNotIn('Evaluate and build the selected native package', publisher)
 
 
