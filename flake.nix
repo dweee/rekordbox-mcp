@@ -1,7 +1,7 @@
 {
   description = "rekordbox-mcp fork with standalone Nix packaging";
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/177d0540942fb205af6993b1d5fa0b57799e09f8";
+    nixpkgs.url = "github:nixos/nixpkgs/d4f25a3e562008648d45bcf2d70bcc7422cad84e";
     
   };
   outputs = { self, nixpkgs, ... }:
