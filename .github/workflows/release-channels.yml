@@ -85,6 +85,7 @@ jobs:
     - test
     outputs:
       proof: ${{ steps.release.outputs.proof }}
+      retention: ${{ steps.release.outputs.retention }}
     if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/flakey' }}
     steps:
     - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -126,8 +127,10 @@ jobs:
       run: bash ci/install-niks3.sh --retain-bootstrap
     - name: Publish bootstrap client and completed build dependencies
       run: python3 ci/push-niks3.py --outputs niks3-bootstrap-outputs.txt
-    - name: Build complete inventory, checkpoint closures, verify remote NAR bytes
+    - name: Build complete inventory, checkpoint closures, verify signed cache metadata, pin release
       id: release
+      env:
+        STATUS_TOKEN: ${{ github.token }}
       run: python3 ci/release-channel.py build --system aarch64-darwin
     - name: Remove cache reader
       if: ${{ always() }}
@@ -135,6 +138,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      checks: write
   retain_aarch64_darwin:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
@@ -237,6 +241,8 @@ jobs:
       env:
         CHANNEL_TOKEN: ${{ secrets.CHANNEL_TOKEN || github.token }}
         RELEASE_PROOFS: '{"aarch64-darwin": "${{ needs.build_aarch64_darwin.outputs.proof }}"}'
+        RELEASE_RETENTION: '{"aarch64-darwin": "${{ needs.build_aarch64_darwin.outputs.retention }}"}'
         REVISION: ${{ needs.test.outputs.revision }}
         CHANNEL: ${{ inputs.channel || 'tested' }}
       run: python3 ci/release-channel.py promote --channel "$CHANNEL" --revision "$REVISION" --proofs "$RELEASE_PROOFS"
+        --retention "$RELEASE_RETENTION"
