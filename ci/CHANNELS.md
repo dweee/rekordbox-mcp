@@ -64,8 +64,7 @@ Required repository configuration:
   tags, PRs and monitoring issues. Protect `tested`/`stable` against human or
   unrelated automation writes; allow only the release workflow identity.
 - Forgejo requires repository-scoped `FLAKEY_NIKS3_READ_NETRC` and
-  `FLAKEY_NIKS3_WRITE_TOKEN`. Niks3 is its substitute and verified release cache;
-  existing Attic secrets and historical objects remain.
+  `FLAKEY_NIKS3_WRITE_TOKEN`. Niks3 is its substitute and verified release cache.
 - GitHub requires no Niks3 static secrets: trusted publishers request a write grant through
   OIDC with audience `https://niks3.monke.fail`. Trusted readers use the separate
   read-only audience `https://niks3.monke.fail/read` and `/oidc` cache object route,
@@ -90,8 +89,10 @@ Required repository configuration:
   The updater explicitly dispatches them on the update branch head, including
   when using GITHUB_TOKEN. Each workflow must keep cache publication and secrets
   restricted to the trusted source branch. The updater requires Actions write.
-- Optional `UPDATE_TOKEN` is a repository-scoped app/PAT; default GITHUB_TOKEN
-  PRs do not emit further pull_request workflow events.
+  It waits for the dispatched PR checks workflow’s `test` job on the exact head
+  and publishes its success with the GitHub Actions token and Statuses write.
+- Optional `UPDATE_TOKEN` is a repository-scoped app/PAT. With GITHUB_TOKEN,
+  GitHub requires approval before the pull_request workflow runs.
 - Each update is a commit of the current target branch plus the new pins, with
   the previous update head as a parent, so the branch only moves forward and is
   never force-pushed. A candidate whose checks are still pending is left to
@@ -101,14 +102,9 @@ Required repository configuration:
 - Forgejo requires the existing native `nix` and native aarch64 Linux runners. Flakey
   and private inputs never go to GitHub. Already-public GitHub owning repos may
   use their existing native hosted Darwin builders independently.
-- Forgejo jobs on the `nix` runner (x86_64 Linux build and the x86_64 Linux and
-  Darwin retention jobs) set `ATTIC_SERVER` to the Attic host's runner-network
-  address, so cache reads skip the public reverse proxy. The helpers accept only
-  that address, the tailnet address of the same listener, or the public URL, send
-  the token to one host only, and keep proofs independent of the transport. The
-  braco aarch64 build and retention jobs, Darwin builds and all uploads use the
-  public HTTPS URL. The aarch64 Linux retention job runs on braco, which executes
-  one job at a time: it queues behind other repositories' aarch64 jobs.
+- Every job reads and publishes through the public HTTPS Niks3 URL. The aarch64
+  Linux retention job runs on braco, which executes one job at a time: it queues
+  behind other repositories' aarch64 jobs.
 - Schedules keep their cadence (release channels nightly, input updates every six
   hours) but start at a per-repository offset derived from a SHA-256 of
   `owner/name`: release channels at a minute of the UTC day (00:00-23:59), input updates at a

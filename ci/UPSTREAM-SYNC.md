@@ -6,7 +6,7 @@ required custom files, native builds, regression commands and any history filter
 
 `FORK_CI_ENABLED=true` enables candidate updates. Automatic promotion remains off
 until build/cache acceptance, then requires both `auto-merge: true` in the caller
-and `FORK_CI_AUTO_MERGE=true`. Attic uploads use the separately scoped repository
-secret described in [ATTIC.md](ATTIC.md). Every successful build retains a closure
-archive independently of Attic. Filtered forks must use the same `history_exclude`
+and `FORK_CI_AUTO_MERGE=true`. Cache uploads go to Niks3 through GitHub OIDC; no cache
+secret is stored in the repository. Every successful build retains a closure
+archive independently of the cache. Filtered forks must use the same `history_exclude`
 policy for their imported base and every upstream update.
