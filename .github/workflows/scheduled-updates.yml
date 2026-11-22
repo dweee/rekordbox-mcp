@@ -60,11 +60,16 @@ jobs:
         MONITOR_TOKEN: ''
       run: python3 ci/update-monitor.py
     - name: Maintain one version monitoring issue
-      if: ${{ always() }}
+      if: ${{ always() && github.event.repository.has_issues }}
       env:
         AUTOMATION_TOKEN: ${{ secrets.UPDATE_TOKEN || github.token }}
       run: python3 ci/automation-forge.py report
   inputs:
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+      statuses: write
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -111,4 +116,5 @@ jobs:
     - name: Open a review PR for changed pins
       env:
         AUTOMATION_TOKEN: ${{ secrets.UPDATE_TOKEN || github.token }}
+        AUTOMATION_STATUS_TOKEN: ${{ github.token }}
       run: python3 ci/automation-forge.py inputs
